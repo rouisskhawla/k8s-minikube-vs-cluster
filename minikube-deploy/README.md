@@ -162,7 +162,7 @@ http://<minikube-ip>:30082
 Deployment state and pod logs are documented in:
 
 
-* [Minikube Docs](minikube-deploy/docs/)
+* [Minikube Docs](docs/)
 
 
 ---
