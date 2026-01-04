@@ -75,19 +75,12 @@ pipeline {
       }
     }
 
-    stage('Start Minikube') {
-      steps {
-        script {
-          sh 'minikube start --driver=docker || true'
-          sh 'kubectl config use-context minikube'
-        }
-      }
-    }
-
     stage('Deploy to Minikube') {
       steps {
         input 'Do you want to deploy to Minikube?'
         script {
+          sh 'minikube start --driver=docker || true'
+          sh 'kubectl config use-context minikube'
           sh 'kubectl apply -f minikube-deploy/deployment.yaml'
         }
       }

@@ -15,6 +15,11 @@ spec:
       containers:
         - name: k8s-minikube-vs-cluster
           image: khawlarouiss/k8s-minikube-vs-cluster:latest
-          imagePullPolicy: Always
           ports:
             - containerPort: 8082
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8082
+            initialDelaySeconds: 5
+            periodSeconds: 5
