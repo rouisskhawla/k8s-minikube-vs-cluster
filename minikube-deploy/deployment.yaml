@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-minikube-vs-cluster
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8s-minikube-vs-cluster
+  template:
+    metadata:
+      labels:
+        app: k8s-minikube-vs-cluster
+    spec:
+      containers:
+        - name: k8s-minikube-vs-cluster
+          image: khawlarouiss/k8s-minikube-vs-cluster:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8082

@@ -63,17 +63,45 @@ pipeline {
     }
     
     stage('Build and Push Image to Docker Registry') {
-        steps {
-            input 'Do you want to build and push the Docker image?'
-            script {
+      steps {
+        input 'Do you want to build and push the Docker image?'
+        script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}")
-                {
-            docker.build("${REPO_NAME}:latest", '-f Dockerfile .')
-            docker.image("${REPO_NAME}:latest").push('latest')
-                }
+            {
+              docker.build("${REPO_NAME}:latest", '-f Dockerfile .')
+              docker.image("${REPO_NAME}:latest").push('latest')
             }
         }
+      }
     }
+
+    stage('Start Minikube') {
+      steps {
+        script {
+          sh 'minikube start --driver=docker || true'
+          sh 'kubectl config use-context minikube'
+        }
+      }
+    }
+
+    stage('Deploy to Minikube') {
+      steps {
+        input 'Do you want to deploy to Minikube?'
+        script {
+          sh 'kubectl apply -f minikube-deploy/deployment.yaml'
+        }
+      }
+    }
+
+    stage('Verify Minikube Deployment') {
+      steps {
+        script {
+          sh 'kubectl rollout status deployment/k8s-minikube-vs-cluster --timeout=120s'
+          sh 'kubectl get pods -o wide'
+        }
+      }
+    }
+
   }
   post {
     always {
