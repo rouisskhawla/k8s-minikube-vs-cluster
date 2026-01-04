@@ -84,3 +84,40 @@ Push to main
     → Manually trigger Deployment to Remote Cluster
     → Deployment Verification
 ```
+
+---
+
+## GitHub Webhook via ngrok
+
+To enable automatic pipeline triggers from GitHub:
+
+1. Install ngrok on the Jenkins VM:
+
+```bash
+wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
+unzip ngrok-stable-linux-amd64.zip
+sudo mv ngrok /usr/local/bin/
+rm ngrok-stable-linux-amd64.zip
+```
+
+2. Start an HTTP tunnel for Jenkins port:
+
+```bash
+ngrok http 8080
+```
+
+3. Copy the public URL from ngrok `https://8f6e6459d005.ngrok-free.app`
+
+4. Configure GitHub webhook in repository:
+
+```
+Payload URL: https://8f6e6459d005.ngrok-free.app/github-webhook/
+Content type: application/json
+Trigger: Just the push event
+```
+
+5. Push to `main` → Jenkins pipeline triggers automatically.
+
+
+---
+
