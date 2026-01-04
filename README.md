@@ -106,12 +106,12 @@ rm ngrok-stable-linux-amd64.zip
 ngrok http 8080
 ```
 
-3. Copy the public URL from ngrok `https://8f6e6459d005.ngrok-free.app`
+3. Copy the public URL from ngrok `https://ed3ede566ec9.ngrok-free.app`
 
 4. Configure GitHub webhook in repository:
 
 ```
-Payload URL: https://8f6e6459d005.ngrok-free.app/github-webhook/
+Payload URL: https://ed3ede566ec9.ngrok-free.app/github-webhook/
 Content type: application/json
 Trigger: Just the push event
 ```
