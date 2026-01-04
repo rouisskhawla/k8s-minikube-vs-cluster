@@ -82,6 +82,7 @@ pipeline {
           sh 'minikube start --driver=docker || true'
           sh 'kubectl config use-context minikube'
           sh 'kubectl apply -f minikube-deploy/deployment.yaml'
+          sh 'kubectl apply -f minikube-deploy/service.yaml'
         }
       }
     }
@@ -91,6 +92,8 @@ pipeline {
         script {
           sh 'kubectl rollout status deployment/k8s-minikube-vs-cluster --timeout=120s'
           sh 'kubectl get pods -o wide'
+          sh 'kubectl get svc'
+          sh 'minikube service k8s-minikube-vs-cluster --url'
         }
       }
     }
