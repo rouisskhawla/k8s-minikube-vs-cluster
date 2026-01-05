@@ -248,56 +248,50 @@ Should show:
   
 ![Kubernetes Cluster State](docs/k8s-cluster-state.png)
 
+---
 
-## 8. Jenkins CI/CD Integration
+### 8. Jenkins CI/CD Integration
 
-### 8.1 Pipeline Overview
+#### **8.1 Pipeline Overview**
 
 * Jenkins builds Docker images on push to GitHub
-* Pushes images to Docker Hub
-* Manually trigger Deploy to Kubernetes cluster stage
-* Deploys application to Kubernetes cluster
+* Built images are pushed to Docker Hub
+* Deployment to the Kubernetes cluster requires **manual approval** in Jenkins
+* Jenkins applies both the Kubernetes Deployment and Service manifests
+* Deployment is verified by checking rollout status, running pods, and service details
 
-### 8.2 Deployment Stage Example
+#### **8.2 Deployment Stage Description**
 
-```groovy
-stage('Deploy to Cluster') {
-    steps {
-        script {
-            sh 'kubectl apply -f cluster-deploy/deployment.yaml'
-            sh 'kubectl rollout status deployment/my-app --timeout=120s'
-            sh 'kubectl get pods -o wide'
-        }
-    }
-}
-```
+* The pipeline pauses for manual confirmation before deploying to the Kubernetes cluster
+* After approval, Jenkins applies:
+
+  * `cluster-deploy/deployment.yaml`
+  * `cluster-deploy/service.yaml`
+* Once deployment is complete, Jenkins verifies:
+
+  * Successful rollout of the Kubernetes deployment
+  * Pod status and node placement
+  * Service exposure and assigned NodePort
 
 ---
 
-## 9. Access Deployed Application
+### 9. Access Deployed Application
 
-1. Expose service as **NodePort** in `service.yaml`:
-
-```yaml
-ports:
-  - containerPort: 8082
-    name: http
-    protocol: TCP
-```
-
-2. Get NodePort:
+* The application is exposed using a **NodePort** service defined in `service.yaml`
+* Retrieve the NodePort assigned to the service:
 
 ```bash
-kubectl get svc
+kubectl get svc k8s-cluster
 ```
 
-3. Access via Worker VM IP + NodePort:
+* Access the application using the Worker Node IP and NodePort:
 
 ```
 http://192.168.1.11:<NODE_PORT>
 ```
 
----
+Replace `<NODE_PORT>` with the value returned by the service listing.
+
 
 ## 10. References
 
