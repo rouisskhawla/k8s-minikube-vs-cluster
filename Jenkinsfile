@@ -64,7 +64,6 @@ pipeline {
     
     stage('Build and Push Image to Docker Registry') {
       steps {
-        input 'Do you want to build and push the Docker image?'
         script {
           docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}")
             {
@@ -77,7 +76,6 @@ pipeline {
 
     stage('Deploy to Minikube') {
       steps {
-        input 'Do you want to deploy to Minikube?'
         script {
           sh 'minikube start --driver=docker || true'
           sh 'kubectl config use-context minikube'
@@ -90,15 +88,36 @@ pipeline {
     stage('Verify Minikube Deployment') {
       steps {
         script {
-          sh 'kubectl rollout status deployment/k8s-minikube-vs-cluster --timeout=120s'
+          sh 'kubectl rollout status deployment/k8s-minikube --timeout=120s'
           sh 'kubectl get pods -o wide'
           sh 'kubectl get svc'
-          sh 'minikube service k8s-minikube-vs-cluster --url'
+          sh 'minikube service k8s-minikube --url'
+        }
+      }
+    }
+
+    stage('Deploy to Kubernetes Cluster') {
+      steps {
+        input message: 'Deploy to Kubernetes Cluster?', ok: 'Deploy'
+        script {
+          sh 'kubectl apply -f cluster-deploy/deployment.yaml'
+          sh 'kubectl apply -f cluster-deploy/service.yaml'
+        }
+      }
+    }
+
+    stage('Verify Kubernetes Cluster Deployment') {
+      steps {
+        script {
+          sh 'kubectl rollout status deployment/k8s-cluster --timeout=120s'
+          sh 'kubectl get pods -o wide'
+          sh 'kubectl get svc k8s-cluster'
         }
       }
     }
 
   }
+  
   post {
     always {
         cleanWs()
