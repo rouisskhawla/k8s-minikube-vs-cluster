@@ -12,11 +12,11 @@ It supports **two deployment scenarios**—**local Minikube** for testing and de
 .
 ├── minikube-deploy/        # Local deployment resources
 │   ├── deployment.yaml
-│   ├── screenshots/
+│   ├── docs/
 │   └── README.md           # Minikube-specific setup & instructions
 ├── cluster-deploy/         # Remote cluster resources
 │   ├── deployment.yaml
-│   ├── screenshots/
+│   ├── docs/
 │   └── README.md           # Cluster-specific setup & instructions
 ├── Jenkinsfile             # Shared CI/CD pipeline
 └── README.md               # Root overview
