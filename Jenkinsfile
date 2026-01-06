@@ -6,7 +6,6 @@ pipeline {
     DOCKER_REGISTRY = 'https://index.docker.io/v1/'
     REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
     DOCKER_CREDENTIALS_ID = 'dockerlogin'
-    DEPLOY_TARGET = "${env.TAG_NAME?.startsWith('v') ? 'cluster' : 'minikube'}"
   }
 
   stages {
@@ -21,6 +20,19 @@ pipeline {
             credentialsId: 'github'
           ]]
         ])
+      }
+    }
+    
+    stage('Set Deployment Target') {
+      steps {
+        script {
+          if (env.TAG_NAME?.startsWith('v')) {
+            env.DEPLOY_TARGET = 'cluster'
+          } else {
+            env.DEPLOY_TARGET = 'minikube'
+          }
+          echo "Deployment target: ${env.DEPLOY_TARGET}"
+        }
       }
     }
 
@@ -64,18 +76,6 @@ pipeline {
         }
       }
     }
-    
-    stage('Build and Push Image to Docker Registry') {
-      steps {
-        script {
-          docker.withRegistry("${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}")
-            {
-              docker.build("${REPO_NAME}:latest", '-f Dockerfile .')
-              docker.image("${REPO_NAME}:latest").push('latest')
-            }
-        }
-      }
-    }
 
     stage('Build & Push Docker Image') {
       steps {
@@ -95,8 +95,7 @@ pipeline {
         }
       }
     }
-
-
+    
     stage('Deploy to Minikube') {
       when {
         expression { env.DEPLOY_TARGET == 'minikube' }
