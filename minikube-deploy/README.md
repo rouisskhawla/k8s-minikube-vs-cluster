@@ -5,6 +5,11 @@ It includes the **Kubernetes Deployment manifest**, a **Service manifest**, **sc
 
 ---
 
+> **Note:** In the Jenkins pipeline, the **DEPLOY_TARGET** is automatically set to `minikube` for commits to `main`. The pipeline will deploy to Minikube. Docker images are tagged using `scripts/docker-tag.sh`, ensuring snapshots have unique version numbers.
+
+---
+
+
 ## 1. VM and Environment Setup
 
 ### 1.1 Jenkins User Preparation
@@ -79,18 +84,14 @@ kubectl version --client
 The **Jenkinsfile** in the project root performs the full CI/CD pipeline.
 For Minikube deployment, the pipeline:
 
-1. **Clones the repository**
-2. **Runs Maven build and tests**
-3. **Packages the application**
-4. **Logs in to Docker Hub**
-5. **Builds and pushes the Docker image**
-6. **Deploys to Minikube**
-7. **Verifies rollout and pod readiness**
-
-**Manual approvals:**
-
-* Docker image build and push
-* Minikube deployment
+1. **Clones the repository** from GitHub
+2. **Sets the deployment target** (`DEPLOY_TARGET = minikube` for commits to `main`)
+3. **Runs Maven build and tests**
+4. **Packages the application**
+5. **Logs in to Docker Hub** using credentials stored in Jenkins
+6. **Builds and pushes the Docker image** with versioning handled by `scripts/docker-tag.sh`
+7. **Deploys to Minikube** using the environment-specific manifests
+8. **Verifies rollout and pod readiness**
 
 ---
 
@@ -181,3 +182,7 @@ readinessProbe:
 ```
 
 ---
+
+## 5. References
+
+* [Minikube docs](https://minikube.sigs.k8s.io/docs/)
