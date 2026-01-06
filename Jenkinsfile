@@ -6,27 +6,10 @@ pipeline {
     DOCKER_REGISTRY = 'https://index.docker.io/v1/'
     REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
     DOCKER_CREDENTIALS_ID = 'dockerlogin'
-  }
-
-  parameters {
-    choice(
-      name: 'DEPLOY_TARGET',
-      choices: ['--select--', 'minikube', 'cluster'],
-      description: 'Select deployment target'
-    )
+    DEPLOY_TARGET = "${env.TAG_NAME?.startsWith('v') ? 'cluster' : 'minikube'}"
   }
 
   stages {
-
-    stage('Validate Parameters') {
-      steps {
-        script {
-          if (params.DEPLOY_TARGET == '--select--') {
-            error('You must select a deployment target')
-          }
-        }
-      }
-    }
 
     stage('Clone Github Repository') {
       steps {
@@ -94,9 +77,29 @@ pipeline {
       }
     }
 
+    stage('Build & Push Docker Image') {
+      steps {
+        script {
+          def imageTag = sh(
+            script: "./scripts/docker-tag.sh",
+            returnStdout: true
+          ).trim()
+
+          echo "Docker image tag: ${imageTag}"
+
+          docker.withRegistry(DOCKER_REGISTRY, DOCKER_CREDENTIALS_ID) {
+            def img = docker.build("${REPO_NAME}:${imageTag}", "-f Dockerfile .")
+            img.push()
+            img.push('latest')
+          }
+        }
+      }
+    }
+
+
     stage('Deploy to Minikube') {
       when {
-        expression { params.DEPLOY_TARGET == 'minikube' }
+        expression { env.DEPLOY_TARGET == 'minikube' }
       }
       steps {
         sh 'minikube start --driver=docker || true'
@@ -108,7 +111,7 @@ pipeline {
 
     stage('Verify Minikube Deployment') {
       when {
-        expression { params.DEPLOY_TARGET == 'minikube' }
+        expression { env.DEPLOY_TARGET == 'minikube' }
       }
       steps {
         sh 'kubectl rollout status deployment/k8s-minikube --timeout=120s'
@@ -118,9 +121,18 @@ pipeline {
       }
     }
 
+    stage('Approval for Cluster Deployment') {
+      when {
+        expression { env.DEPLOY_TARGET == 'cluster' }
+      }
+      steps {
+        input message: "Deploy to Kubernetes cluster?", ok: "Deploy"
+      }
+    }
+
     stage('Deploy to Kubernetes Cluster') {
       when {
-        expression { params.DEPLOY_TARGET == 'cluster' }
+        expression { env.DEPLOY_TARGET == 'cluster' }
       }
       steps {
         sh 'kubectl apply -f cluster-deploy/deployment.yaml'
@@ -130,7 +142,7 @@ pipeline {
 
     stage('Verify Kubernetes Cluster Deployment') {
       when {
-        expression { params.DEPLOY_TARGET == 'cluster' }
+        expression { env.DEPLOY_TARGET == 'cluster' }
       }
       steps {
         sh 'kubectl rollout status deployment/k8s-cluster --timeout=120s'
