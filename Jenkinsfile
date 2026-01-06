@@ -12,13 +12,7 @@ pipeline {
 
     stage('Clone Github Repository') {
       steps {
-        checkout([
-          $class: 'GitSCM',
-          branches: [[name: 'main']],
-          userRemoteConfigs: [[
-            url: 'git@github.com:rouisskhawla/k8s-minikube-vs-cluster.git',
-            credentialsId: 'github'
-          ]]
+        checkout scm
         ])
       }
     }
@@ -80,13 +74,16 @@ pipeline {
     stage('Build & Push Docker Image') {
       steps {
         script {
+          sh 'chmod +x scripts/docker-tag.sh'
           def imageTag = sh(
-            script: "./scripts/docker-tag.sh",
+            script: """
+              export TAG_NAME='${env.TAG_NAME ?: ''}'
+              export BUILD_NUMBER='${env.BUILD_NUMBER}'
+              ./scripts/docker-tag.sh
+            """,
             returnStdout: true
           ).trim()
-
           echo "Docker image tag: ${imageTag}"
-
           docker.withRegistry(DOCKER_REGISTRY, DOCKER_CREDENTIALS_ID) {
             def img = docker.build("${REPO_NAME}:${imageTag}", "-f Dockerfile .")
             img.push()
@@ -95,7 +92,7 @@ pipeline {
         }
       }
     }
-    
+
     stage('Deploy to Minikube') {
       when {
         expression { env.DEPLOY_TARGET == 'minikube' }

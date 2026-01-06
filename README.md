@@ -1,10 +1,13 @@
 # Multi-Environment CI/CD Pipeline: Minikube & Kubernetes Cluster
 
-This project demonstrates a **CI/CD pipeline for a Spring Boot application** using **Jenkins, Docker, and Kubernetes**.
+A **CI/CD pipeline for a Spring Boot application** using **Jenkins, Docker, and Kubernetes**.
 
-It supports **two deployment scenarios**
+Supports **two deployment targets** with automatic selection:
 
-**local Minikube** for testing and development, and a **remote Kubernetes cluster** for production—using a **Jenkinsfile** with **automatic target selection**.
+* **Minikube** – local development and testing (triggered on `main` commits)
+* **Kubernetes Cluster** – production (triggered by Git tags with manual approval)
+
+Single **Jenkinsfile** manages build, Docker image push, and deployment for both environments.
 
 ---
 
@@ -288,4 +291,3 @@ Trigger: Just the push event
 
 * Push to `main` → Jenkins pipeline triggers **Minikube deployment** automatically.
 * Push a Git tag `vX.Y.Z` → Jenkins pipeline triggers **Kubernetes cluster deployment** with **manual approval**.
-
