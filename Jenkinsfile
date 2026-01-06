@@ -1,21 +1,32 @@
 pipeline {
-    agent any
 
-    environment {
-        DOCKER_REGISTRY = 'https://index.docker.io/v1/'
-        REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
-        DOCKER_CREDENTIALS_ID = 'dockerlogin'
-    }
+  agent any
 
-    parameters {
-        choice(
-            name: 'DEPLOY_TARGET',
-            choices: ['minikube', 'cluster'],
-            description: 'Select deployment target'
-        )
-    }
+  environment {
+    DOCKER_REGISTRY = 'https://index.docker.io/v1/'
+    REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
+    DOCKER_CREDENTIALS_ID = 'dockerlogin'
+  }
+
+  parameters {
+    choice(
+      name: 'DEPLOY_TARGET',
+      choices: ['--select--', 'minikube', 'cluster'],
+      description: 'Select deployment target'
+    )
+  }
 
   stages {
+
+    stage('Validate Parameters') {
+      steps {
+        script {
+          if (params.DEPLOY_TARGET == '--select--') {
+            error('You must select a deployment target')
+          }
+        }
+      }
+    }
 
     stage('Clone Github Repository') {
       steps {
