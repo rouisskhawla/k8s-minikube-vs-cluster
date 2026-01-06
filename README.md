@@ -176,32 +176,42 @@ Push Git tag vX.Y.Z
 
 To enable automatic pipeline triggers from GitHub:
 
-1. Install ngrok on the Jenkins VM:
+1. **Install ngrok on the Jenkins VM**:
 
 ```bash
-wget https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip
-unzip ngrok-stable-linux-amd64.zip
-sudo mv ngrok /usr/local/bin/
-rm ngrok-stable-linux-amd64.zip
+curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+  | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null \
+  && echo "deb https://ngrok-agent.s3.amazonaws.com bookworm main" \
+  | sudo tee /etc/apt/sources.list.d/ngrok.list \
+  && sudo apt update \
+  && sudo apt install ngrok
 ```
 
-2. Start an HTTP tunnel for Jenkins port:
+2. **Add ngrok authentication token**:
+
+```bash
+ngrok config add-authtoken <YOUR_NGROK_TOKEN>
+```
+
+3. **Start an HTTP tunnel for Jenkins** :
 
 ```bash
 ngrok http 8080
 ```
 
-3. Copy the public URL from ngrok (e.g., `https://ed3ede566ec9.ngrok-free.app`)
+4. **Copy the public URL** provided by ngrok
+   (e.g., `https://ed3ede566ec9.ngrok-free.app`).
 
-4. Configure GitHub webhook in repository:
+5. **Configure GitHub webhook** in GitHub repository:
 
 ```
-Payload URL: https://ed3ede566ec9.ngrok-free.app/github-webhook/
+Payload URL: https://<ngrok-public-url>/github-webhook/
 Content type: application/json
 Trigger: Just the push event
 ```
 
-5. Push to `main` → Jenkins pipeline triggers automatically.
-   Push a **tag** `vX.Y.Z` → triggers **cluster deployment with manual approval**.
+6. **Triggering deployments**:
 
----
+* Push to `main` → Jenkins pipeline triggers **Minikube deployment** automatically.
+* Push a Git tag `vX.Y.Z` → Jenkins pipeline triggers **Kubernetes cluster deployment** with **manual approval**.
+
