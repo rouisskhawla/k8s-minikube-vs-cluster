@@ -10,6 +10,10 @@ It includes:
 
 ---
 
+> **Note:** In the Jenkins pipeline, `DEPLOY_TARGET` is automatically set to `cluster` when a Git **tag** (`vX.Y.Z`) is pushed. Deployment requires **manual approval** before applying manifests. Docker images are tagged using `scripts/docker-tag.sh`, ensuring consistent versioning.
+
+---
+
 ## 1. Cluster Overview
 
 **Architecture:**
@@ -252,26 +256,21 @@ Should show:
 
 ### 8. Jenkins CI/CD Integration
 
-#### **8.1 Pipeline Overview**
+* `DEPLOY_TARGET = cluster` for Git tags (`vX.Y.Z`)
+* Deployment **requires manual approval** in Jenkins before applying manifests
+* Jenkins applies:
 
-* Jenkins builds Docker images on push to GitHub
-* Built images are pushed to Docker Hub
-* Deployment to the Kubernetes cluster requires **manual approval** in Jenkins
-* Jenkins applies both the Kubernetes Deployment and Service manifests
-* Deployment is verified by checking rollout status, running pods, and service details
+```bash
+kubectl apply -f cluster-deploy/deployment.yaml
+kubectl apply -f cluster-deploy/service.yaml
+```
 
-#### **8.2 Deployment Stage Description**
+* Deployment is verified via:
 
-* The pipeline pauses for manual confirmation before deploying to the Kubernetes cluster
-* After approval, Jenkins applies:
+  * Rollout status of the Kubernetes deployment
+  * Pod readiness and node placement
+  * Service exposure and NodePort
 
-  * `cluster-deploy/deployment.yaml`
-  * `cluster-deploy/service.yaml`
-* Once deployment is complete, Jenkins verifies:
-
-  * Successful rollout of the Kubernetes deployment
-  * Pod status and node placement
-  * Service exposure and assigned NodePort
 
 ---
 

@@ -69,6 +69,77 @@ DEPLOY_TARGET = env.TAG_NAME?.startsWith('v') ? 'cluster' : 'minikube'
 
 ---
 
+## Jenkins Pipeline Configuration (Multibranch)
+
+This project is configured as a **Jenkins Multibranch Pipeline** to support **branch-based** and **tag-based** executions using `Jenkinsfile`.
+
+### Job Type
+
+* **Jenkins job:** Multibranch Pipeline
+* **Pipeline definition:** `Jenkinsfile` from SCM
+* **Repository:** GitHub
+
+---
+
+### Required Multibranch Settings
+
+In Jenkins, configure the Multibranch Pipeline with the following options:
+
+#### Branch Sources → Git
+
+* **Repository URL**
+
+  ```
+  git@github.com:rouisskhawla/k8s-minikube-vs-cluster.git
+  ```
+* **Credentials:** GitHub SSH key
+
+#### Behaviours
+
+Enable:
+
+* **Discover branches**
+* **Discover tags**
+
+This allows Jenkins to automatically create pipelines for:
+
+* `main` branch
+* Git tags
+
+---
+
+### Build Configuration
+
+* **Mode:** by Jenkinsfile
+* **Script Path:** `Jenkinsfile`
+
+---
+
+### Pipeline Trigger Behavior
+
+* **Push to `main`**
+
+  * Triggers CI + **Minikube deployment**
+* **Push Git tag `vX.Y.Z`**
+
+  * Triggers **production pipeline**
+  * Requires **manual approval**
+  * Deploys to **Kubernetes cluster**
+
+The deployment target is resolved automatically inside the Jenkinsfile using Git context.
+
+---
+
+### Jenkins Environment Variables Used
+
+| Variable       | Purpose                                     |
+| -------------- | ------------------------------------------- |
+| `BRANCH_NAME`  | Identifies branch or tag name               |
+| `TAG_NAME`     | Set only when the build is triggered by tag |
+| `BUILD_NUMBER` | Used for snapshot image versioning          |
+
+---
+
 ### Deployment Target in Jenkinsfile
 
 To ensure **only the relevant stages execute**, add the following **`when` expressions** to each environment-specific stage:
