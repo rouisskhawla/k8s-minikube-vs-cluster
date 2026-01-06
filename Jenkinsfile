@@ -7,7 +7,16 @@ pipeline {
         DOCKER_CREDENTIALS_ID = 'dockerlogin'
     }
 
+    parameters {
+        choice(
+            name: 'DEPLOY_TARGET',
+            choices: ['minikube', 'cluster'],
+            description: 'Select deployment target'
+        )
+    }
+
   stages {
+
     stage('Clone Github Repository') {
       steps {
         checkout([
@@ -75,44 +84,47 @@ pipeline {
     }
 
     stage('Deploy to Minikube') {
+      when {
+        expression { params.DEPLOY_TARGET == 'minikube' }
+      }
       steps {
-        script {
-          sh 'minikube start --driver=docker || true'
-          sh 'kubectl config use-context minikube'
-          sh 'kubectl apply -f minikube-deploy/deployment.yaml'
-          sh 'kubectl apply -f minikube-deploy/service.yaml'
-        }
+        sh 'minikube start --driver=docker || true'
+        sh 'kubectl config use-context minikube'
+        sh 'kubectl apply -f minikube-deploy/deployment.yaml'
+        sh 'kubectl apply -f minikube-deploy/service.yaml'
       }
     }
 
     stage('Verify Minikube Deployment') {
+      when {
+        expression { params.DEPLOY_TARGET == 'minikube' }
+      }
       steps {
-        script {
-          sh 'kubectl rollout status deployment/k8s-minikube --timeout=120s'
-          sh 'kubectl get pods -o wide'
-          sh 'kubectl get svc'
-          sh 'minikube service k8s-minikube --url'
-        }
+        sh 'kubectl rollout status deployment/k8s-minikube --timeout=120s'
+        sh 'kubectl get pods -o wide'
+        sh 'kubectl get svc'
+        sh 'minikube service k8s-minikube --url'
       }
     }
 
     stage('Deploy to Kubernetes Cluster') {
+      when {
+        expression { params.DEPLOY_TARGET == 'cluster' }
+      }
       steps {
-        input message: 'Deploy to Kubernetes Cluster?', ok: 'Deploy'
-        script {
-          sh 'kubectl apply -f cluster-deploy/deployment.yaml'
-          sh 'kubectl apply -f cluster-deploy/service.yaml'
-        }
+        sh 'kubectl apply -f cluster-deploy/deployment.yaml'
+        sh 'kubectl apply -f cluster-deploy/service.yaml'
       }
     }
 
     stage('Verify Kubernetes Cluster Deployment') {
+      when {
+        expression { params.DEPLOY_TARGET == 'cluster' }
+      }
       steps {
-        script {
-          sh 'kubectl rollout status deployment/k8s-cluster --timeout=120s'
-          sh 'kubectl get pods -o wide'
-          sh 'kubectl get svc k8s-cluster'
-        }
+        sh 'kubectl rollout status deployment/k8s-cluster --timeout=120s'
+        sh 'kubectl get pods -o wide'
+        sh 'kubectl get svc k8s-cluster'
       }
     }
 
