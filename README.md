@@ -112,6 +112,8 @@ This allows Jenkins to automatically create pipelines for:
 * `main` branch
 * Git tags
 
+* See Multibranch Pipeline configuration  [`docs/multibranch-pipeline.png`](docs/multibranch-pipeline.png)
+
 ---
 
 ### Build Configuration
@@ -227,7 +229,11 @@ Push to main (no tag)
     → Docker Image Build & Push
     → Deployment Minikube 
     → Deployment Verification
+```
 
+* ![`docs/snapshot-pipeline.png`](docs/snapshot-pipeline.png)
+
+```
 Push Git tag vX.Y.Z
  → Jenkins Pipeline
     → Maven Build & Tests
@@ -236,6 +242,8 @@ Push Git tag vX.Y.Z
     → Deployment to Kubernetes Cluster
     → Deployment Verification
 ```
+
+* ![`docs/production-pipeline.png`](docs/production-pipeline.png)
 
 ---
 
@@ -287,7 +295,11 @@ Content type: application/json
 Trigger: Just the push event
 ```
 
+* See GitHub webhook screenshot: [`docs/github-webhook.png`](docs/github-webhook.png)
+
 6. **Triggering deployments**:
 
 * Push to `main` → Jenkins pipeline triggers **Minikube deployment** automatically.
 * Push a Git tag `vX.Y.Z` → Jenkins pipeline triggers **Kubernetes cluster deployment** with **manual approval**.
+
+
