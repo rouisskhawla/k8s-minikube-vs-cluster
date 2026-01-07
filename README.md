@@ -2,12 +2,12 @@
 
 A **CI/CD pipeline for a Spring Boot application** using **Jenkins, Docker, and Kubernetes**.
 
-Supports **two deployment targets** with automatic selection:
+The pipeline supports **two deployment targets** with automatic selection based on **GitHub webhook context**:
 
-* **Minikube** – local development and testing (triggered on `main` commits)
-* **Kubernetes Cluster** – production (triggered by Git tags with manual approval)
+* **Minikube** – local development and testing (triggered by pushes to `main`)
+* **Kubernetes Cluster** – production environment (triggered by Git tags)
 
-Single **Jenkinsfile** manages build, Docker image push, and deployment for both environments.
+A single **Jenkins Pipeline job** and **one Jenkinsfile** manage build, Docker image publishing, and deployment for both environments.
 
 ---
 
@@ -23,245 +23,135 @@ Single **Jenkinsfile** manages build, Docker image push, and deployment for both
 │   ├── deployment.yaml
 │   ├── docs/
 │   └── README.md           # Cluster-specific setup & instructions
-├── Jenkinsfile             # Shared CI/CD pipeline
-├── scripts/                # CI/CD scripts
-└── README.md               # Root overview
+├── Jenkinsfile             # CI/CD pipeline definition
+├── scripts/                # CI/CD helper scripts
+│   └── docker-tag.sh
+└── README.md               # Project overview
 ```
 
 **Notes:**
 
-* Both folders contain **Kubernetes manifests** and **documentation** for their environment.
-* The **Jenkinsfile** handles **build, Docker image push, and deployment**, selecting the appropriate environment automatically.
-* Deployment target is determined by **GitHub context**:
-
-  * **Push to `main`** → Minikube
-  * **Push tag `vX.Y.Z`** → Kubernetes cluster (production release)
+* Each deployment folder contains **environment-specific Kubernetes manifests**.
+* The **Jenkinsfile** controls build, Docker image creation, and deployment.
+* The deployment target is selected automatically using **GitHub webhook payload data**.
 
 ---
 
-## Deployment Approaches
+## Deployment Targets
 
 ### 1. Minikube
 
-* Triggered **automatically** on push to `main`.
-* Runs on **Jenkins VM** using Minikube.
-* Suitable for **local development, testing, and CI validation**.
-* Deployment state is documented in `minikube-deploy/docs/`.
-* Detailed instructions are in [`minikube-deploy/README.md`](minikube-deploy/README.md).
+* Triggered automatically on **push to `main`**
+* Runs on the **Jenkins VM** using Minikube
+* Used for **local development, testing, and CI validation**
+* Kubernetes manifests are stored in `minikube-deploy/`
+* Deployment details and screenshots are documented in:
 
-### 2. Remote Kubernetes Cluster
+  * `minikube-deploy/README.md`
+  * `minikube-deploy/docs/`
 
-* Triggered **automatically** when a **Git tag** matching `vX.Y.Z` is pushed.
-* Runs on a **separate cluster** (VM).
-* Simulates **production environment**.
-* Requires **manual approval in Jenkins** before deployment (production safety).
-* Deployment state is documented in `cluster-deploy/docs/`.
-* Detailed instructions are in [`cluster-deploy/README.md`](cluster-deploy/README.md).
+---
+
+### 2. Kubernetes Cluster (Production)
+
+* Triggered automatically on **Git tag push** (`vX.Y.Z`)
+* Deploys to a **remote Kubernetes cluster**
+* Simulates a **production environment**
+* Requires **manual approval in Jenkins** before deployment
+* Kubernetes manifests are stored in `cluster-deploy/`
+* Deployment details and screenshots are documented in:
+
+  * `cluster-deploy/README.md`
+  * `cluster-deploy/docs/`
 
 ---
 
 ## Jenkins Pipeline Overview
 
-* **Jenkinsfile** orchestrates CI/CD for both environments.
-* Deployment target is determined **automatically**:
+* A **Jenkins Pipeline job** is used.
+* The pipeline is triggered by **GitHub webhooks**.
+* Deployment target selection is based on the Git reference received in the webhook payload.
+
+### Deployment Target Resolution
 
 ```groovy
-// Determine deployment target
 DEPLOY_TARGET = env.TAG_NAME?.startsWith('v') ? 'cluster' : 'minikube'
 ```
 
-* **Minikube** → commit on `main` without a tag
-* **Cluster** → Git tag starting with `v` (production release)
+| Git Event         | Deployment Target  |
+| ----------------- | ------------------ |
+| Push to `main`    | Minikube           |
+| Push tag `vX.Y.Z` | Kubernetes cluster |
 
 ---
 
-## Jenkins Pipeline Configuration (Multibranch)
-
-This project is configured as a **Jenkins Multibranch Pipeline** to support **branch-based** and **tag-based** executions using `Jenkinsfile`.
+## Jenkins Pipeline Job Configuration
 
 ### Job Type
 
-* **Jenkins job:** Multibranch Pipeline
-* **Pipeline definition:** `Jenkinsfile` from SCM
-* **Repository:** GitHub
-
----
-
-### Required Multibranch Settings
-
-In Jenkins, configure the Multibranch Pipeline with the following options:
-
-#### Branch Sources → Git
-
-* **Repository URL**
+* **Jenkins job:** Pipeline
+* **Pipeline definition:** Pipeline script from SCM
+* **SCM:** Git
+* **Repository URL:**
 
   ```
   git@github.com:rouisskhawla/k8s-minikube-vs-cluster.git
   ```
 * **Credentials:** GitHub SSH key
-
-#### Behaviours
-
-Enable:
-
-* **Discover branches**
-* **Discover tags**
-
-This allows Jenkins to automatically create pipelines for:
-
-* `main` branch
-* Git tags
-
-* See Multibranch Pipeline configuration  [`docs/multibranch-pipeline.png`](docs/multibranch-pipeline.png)
-
----
-
-### Build Configuration
-
-* **Mode:** by Jenkinsfile
 * **Script Path:** `Jenkinsfile`
 
 ---
 
-### Pipeline Trigger Behavior
+## Webhook Trigger Configuration (Generic Webhook Trigger)
 
-* **Push to `main`**
+The pipeline is triggered using the **Generic Webhook Trigger** plugin.
 
-  * Triggers CI + **Minikube deployment**
-* **Push Git tag `vX.Y.Z`**
+### Required Jenkins Plugin
 
-  * Triggers **production pipeline**
-  * Requires **manual approval**
-  * Deploys to **Kubernetes cluster**
-
-The deployment target is resolved automatically inside the Jenkinsfile using Git context.
+* **Generic Webhook Trigger**
 
 ---
 
-### Jenkins Environment Variables Used
+### Build Trigger Settings
 
-| Variable       | Purpose                                     |
-| -------------- | ------------------------------------------- |
-| `BRANCH_NAME`  | Identifies branch or tag name               |
-| `TAG_NAME`     | Set only when the build is triggered by tag |
-| `BUILD_NUMBER` | Used for snapshot image versioning          |
+In the Jenkins Pipeline job configuration:
 
----
-
-### Deployment Target in Jenkinsfile
-
-To ensure **only the relevant stages execute**, add the following **`when` expressions** to each environment-specific stage:
-
-```groovy
-// For Minikube deployment stages
-when {
-    expression { env.DEPLOY_TARGET == 'minikube' }
-}
-
-// For Kubernetes Cluster deployment stages
-when {
-    expression { env.DEPLOY_TARGET == 'cluster' }
-}
-```
-
-## Docker Image Versioning
-
-The Docker image tag depends on whether the build is for a **release** or a **snapshot**:
-
-### 1. Production Release
-
-* Triggered by Git tag `vX.Y.Z`
-* Docker image tag = `X.Y.Z`
-
-Example:
-
-| Git Event         | IMAGE_TAG |
-| ----------------- | --------- |
-| Tag push `v0.1.0` | `0.1.0`   |
-
-### 2. Snapshot Build
-
-* Triggered by a commit on `main` **without a tag**
-* Docker image tag = `LATEST_TAG-BUILD_NUMBER`
-
-  * `LATEST_TAG` = last Git tag (or `0.0.0` if no tags exist)
-  * `BUILD_NUMBER` = incremental Jenkins build number
-
-Examples:
-
-| Latest Tag | Jenkins BUILD_NUMBER | IMAGE_TAG |
-| ---------- | -------------------- | --------- |
-| 0.0.1      | 45                   | 0.0.1-45  |
-| 0.0.1      | 46                   | 0.0.1-46  |
-| 0.0.2      | 50                   | 0.0.2-50  |
-| (no tags)  | 1                    | 0.0.0-1   |
-
-## Versioning Script
-
-* **File:** [scripts/docker-tag.sh](scripts/docker-tag.sh)  
-* **Purpose:** Calculates the Docker image tag based on Git tag or Jenkins build number for snapshot builds.
-* **Make the script executable:**
-
-```bash
-chmod +x scripts/docker-tag.sh
-```
-
-* **Usage in Jenkinsfile:**
-
-```groovy
-// Run the script to get the Docker image tag
-def imageTag = sh(script: "./scripts/calculate-docker-tag.sh", returnStdout: true).trim()
-
-// Use the tag to build and push the Docker image
-docker.build("${REPO_NAME}:${imageTag}", "-f Dockerfile .")
-```
-
-* This approach ensures **unique snapshot versions** per build and **production-safe release tags**.
+1. Go to **Build Triggers**
+2. Enable **Generic Webhook Trigger**
 
 ---
 
-## Execution Flow
+### Extract Variables from GitHub Payload
 
-```
-Push to main (no tag)
- → Jenkins Pipeline 
-    → Maven Build & Tests
-    → Docker Image Build & Push
-    → Deployment Minikube 
-    → Deployment Verification
-```
+Configure the following **Post content parameters**:
 
-* ![`docs/snapshot-pipeline.png`](docs/snapshot-pipeline.png)
+| Variable          | JSONPath Expression | Description              |
+| ----------------- | ------------------- | ------------------------ |
+| `ref`             | `$.ref`             | Full Git reference       |
+| `ref_type`        | `$.ref_type`        | Identifies branch or tag |
+| `repository_name` | `$.repository.name` | Repository name          |
 
-```
-Push Git tag vX.Y.Z
- → Jenkins Pipeline
-    → Maven Build & Tests
-    → Docker Image Build & Push
-    → Manual Approval in Jenkins
-    → Deployment to Kubernetes Cluster
-    → Deployment Verification
-```
+All parameters must have **JSONPath** enabled.
 
-* ![`docs/production-pipeline.png`](docs/production-pipeline.png)
+**Screenshot for configuration:**
+
+  * [Pipeline Job Configuration](docs/pipeline-job-config.png)
 
 ---
 
-## Key Points
+### Trigger Options
 
-* Docker images are **shared** between both deployment targets.
-* Each deployment folder contains **environment-specific resources**; root README provides high-level guidance.
-* Screenshots and documentation in each folder help visualize the deployment state.
-* Designed for easy expansion to **multi-stage pipelines**, automated rollbacks, or production-ready clusters.
-* **Manual approval** ensures production safety for cluster deployments.
+* **Token:** `k8s-webhook-token`
+* **Print post content:** enabled (for debugging)
+* **Print contributed variables:** enabled (for debugging)
 
 ---
 
-## GitHub Webhook via ngrok
+## GitHub Webhook Setup (via ngrok)
 
-To enable automatic pipeline triggers from GitHub:
+To allow GitHub to reach Jenkins running on a private VM, **ngrok** is used.
 
-1. **Install ngrok on the Jenkins VM**:
+### 1. Install ngrok on Jenkins VM
 
 ```bash
 curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
@@ -272,34 +162,147 @@ curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
   && sudo apt install ngrok
 ```
 
-2. **Add ngrok authentication token**:
+Add authentication token:
 
 ```bash
 ngrok config add-authtoken <YOUR_NGROK_TOKEN>
 ```
 
-3. **Start an HTTP tunnel for Jenkins** :
+---
+
+### 2. Start ngrok Tunnel
 
 ```bash
 ngrok http 8080
 ```
 
-4. **Copy the public URL** provided by ngrok
-   (e.g., `https://ed3ede566ec9.ngrok-free.app`).
-
-5. **Configure GitHub webhook** in GitHub repository:
+Example public URL:
 
 ```
-Payload URL: https://<ngrok-public-url>/github-webhook/
-Content type: application/json
-Trigger: Just the push event
+https://1dfd9fa21209.ngrok-free.app
 ```
 
-* See GitHub webhook screenshot: [`docs/github-webhook.png`](docs/github-webhook.png)
+---
 
-6. **Triggering deployments**:
+### 3. Configure GitHub Webhook
 
-* Push to `main` → Jenkins pipeline triggers **Minikube deployment** automatically.
-* Push a Git tag `vX.Y.Z` → Jenkins pipeline triggers **Kubernetes cluster deployment** with **manual approval**.
+In the GitHub repository settings:
 
+| Setting          | Value                                                                        |
+| ---------------- | ---------------------------------------------------------------------------- |
+| Payload URL      | `https://<ngrok-url>/generic-webhook-trigger/invoke?token=k8s-webhook-token` |
+| Content type     | `application/json`                                                           |
+| Secret           | *(empty)*                                                                    |
+| SSL verification | Enabled                                                                      |
+| Trigger events   | Just the push event                                                          |
+
+Example:
+
+```
+https://1dfd9fa21209.ngrok-free.app/generic-webhook-trigger/invoke?token=k8s-webhook-token
+```
+
+**Screenshot:**
+
+[GitHub Webhook Successful Deliveries](docs/github-webhook-deliveries.png)
+
+[GitHub Webhook Configuration](docs/github-webhook-config.png)
+
+
+---
+
+## Jenkins Environment Variables Used
+
+| Variable       | Source                 | Purpose                      |
+| -------------- | ---------------------- | ---------------------------- |
+| `ref`          | GitHub webhook payload | Raw Git reference            |
+| `ref_type`     | GitHub webhook payload | Branch or tag identification |
+| `TAG_NAME`     | Parsed from `ref`      | Production release detection |
+| `BRANCH_NAME`  | Parsed from `ref`      | Branch-based builds          |
+| `BUILD_NUMBER` | Jenkins                | Snapshot image versioning    |
+
+---
+
+## Docker Image Versioning
+
+Docker image tags are generated automatically depending on build type.
+
+### Production Release
+
+* Triggered by Git tag `vX.Y.Z`
+* Docker image tag: `X.Y.Z`
+
+Example:
+
+| Git Tag  | Image Tag |
+| -------- | --------- |
+| `v0.1.0` | `0.1.0`   |
+
+---
+
+### Snapshot Build
+
+* Triggered by a commit on `main`
+* Docker image tag: `LATEST_TAG-BUILD_NUMBER`
+
+Where:
+
+* `LATEST_TAG` = latest Git tag (or `0.0.0` if none exist)
+* `BUILD_NUMBER` = Jenkins build number
+
+Examples:
+
+| Latest Tag | BUILD_NUMBER | Image Tag |
+| ---------- | ------------ | --------- |
+| 0.0.1      | 45           | 0.0.1-45  |
+| 0.0.2      | 50           | 0.0.2-50  |
+| none       | 1            | 0.0.0-1   |
+
+---
+
+## Docker Tagging Script
+
+* **File:** `scripts/docker-tag.sh`
+* **Purpose:** Generates Docker image tags for release and snapshot builds
+
+```bash
+chmod +x scripts/docker-tag.sh
+```
+
+Used in the Jenkinsfile to ensure:
+
+* Clean semantic versioning for production
+* Unique snapshot tags for CI builds
+
+---
+
+## Pipeline Execution Flow
+
+### Snapshot (Minikube)
+
+```
+Push to main
+ → Jenkins Pipeline
+    → Maven Build & Tests
+    → Docker Image Build & Push
+    → Deploy to Minikube
+    → Deployment Verification
+```
+
+![Snapshot Pipeline](docs/snapshot-pipeline.png)
+
+---
+
+### Production (Kubernetes Cluster)
+
+```
+Push Git tag vX.Y.Z
+ → Jenkins Pipeline
+    → Maven Build & Tests
+    → Docker Image Build & Push
+    → Manual Approval
+    → Deploy to Kubernetes Cluster
+    → Deployment Verification
+```
+![Production Pipeline](docs/production-pipeline.png)
 
