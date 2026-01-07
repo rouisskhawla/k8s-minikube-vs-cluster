@@ -1,18 +1,50 @@
 pipeline {
-
   agent any
-
   environment {
     DOCKER_REGISTRY = 'https://index.docker.io/v1/'
     REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
     DOCKER_CREDENTIALS_ID = 'dockerlogin'
   }
-
   stages {
-
+    stage('Parse Webhook Variables') {
+      steps {
+        script {
+          // Print webhook variables for debugging
+          echo "Webhook Variables:"
+          echo "  ref: ${env.ref ?: 'not set'}"
+          echo "  ref_type: ${env.ref_type ?: 'not set'}"
+          echo "  repository_name: ${env.repository_name ?: 'not set'}"
+          
+          // Extract tag or branch name from ref
+          if (env.ref?.startsWith('refs/tags/')) {
+            env.TAG_NAME = env.ref.replaceAll('refs/tags/', '')
+            echo "Tag Name: ${env.TAG_NAME}"
+          } else if (env.ref?.startsWith('refs/heads/')) {
+            env.BRANCH_NAME = env.ref.replaceAll('refs/heads/', '')
+            echo "Branch Name: ${env.BRANCH_NAME}"
+          }
+        }
+      }
+    }
+    
     stage('Clone Github Repository') {
       steps {
-        checkout scm
+        script {
+          if (env.TAG_NAME) {
+            // Checkout specific tag
+            checkout([
+              $class: 'GitSCM',
+              branches: [[name: "refs/tags/${env.TAG_NAME}"]],
+              userRemoteConfigs: [[
+                url: 'git@github.com:rouisskhawla/k8s-minikube-vs-cluster.git',
+                credentialsId: 'your-credentials-id'  // Replace with your actual credentials ID
+              ]]
+            ])
+          } else {
+            // Checkout branch (default behavior)
+            checkout scm
+          }
+        }
       }
     }
     
@@ -28,7 +60,7 @@ pipeline {
         }
       }
     }
-
+    
     stage('Maven Test') {
       tools {
         maven 'Maven 3.9.11'
@@ -39,7 +71,7 @@ pipeline {
         sh 'mvn test'
       }
     }
-
+    
     stage('Maven Package') {
       tools {
         maven 'Maven 3.9.11'
@@ -49,27 +81,25 @@ pipeline {
         sh 'mvn clean package -DskipTests'
       }
     }
-
+    
     stage('Docker Login') {
       steps {
         script {
           withCredentials([
-            usernamePassword
-            (
+            usernamePassword(
               credentialsId: DOCKER_CREDENTIALS_ID,
               usernameVariable: 'DOCKER_USERNAME',
               passwordVariable: 'DOCKER_PASSWORD'
             )
-          ])
-            {
+          ]) {
             sh """
-                echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin
+              echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin
             """
-            }
+          }
         }
       }
     }
-
+    
     stage('Build & Push Docker Image') {
       steps {
         script {
@@ -91,7 +121,7 @@ pipeline {
         }
       }
     }
-
+    
     stage('Deploy to Minikube') {
       when {
         expression { env.DEPLOY_TARGET == 'minikube' }
@@ -103,7 +133,7 @@ pipeline {
         sh 'kubectl apply -f minikube-deploy/service.yaml'
       }
     }
-
+    
     stage('Verify Minikube Deployment') {
       when {
         expression { env.DEPLOY_TARGET == 'minikube' }
@@ -115,7 +145,7 @@ pipeline {
         sh 'minikube service k8s-minikube --url'
       }
     }
-
+    
     stage('Approval for Cluster Deployment') {
       when {
         expression { env.DEPLOY_TARGET == 'cluster' }
@@ -124,7 +154,7 @@ pipeline {
         input message: "Deploy to Kubernetes cluster?", ok: "Deploy"
       }
     }
-
+    
     stage('Deploy to Kubernetes Cluster') {
       when {
         expression { env.DEPLOY_TARGET == 'cluster' }
@@ -134,7 +164,7 @@ pipeline {
         sh 'kubectl apply -f cluster-deploy/service.yaml'
       }
     }
-
+    
     stage('Verify Kubernetes Cluster Deployment') {
       when {
         expression { env.DEPLOY_TARGET == 'cluster' }
@@ -145,12 +175,11 @@ pipeline {
         sh 'kubectl get svc k8s-cluster'
       }
     }
-
   }
   
   post {
     always {
-        cleanWs()
+      cleanWs()
     }
   }
 }
