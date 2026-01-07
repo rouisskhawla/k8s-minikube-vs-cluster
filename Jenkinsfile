@@ -5,8 +5,10 @@ pipeline {
     REPO_NAME = 'khawlarouiss/k8s-minikube-vs-cluster'
     DOCKER_CREDENTIALS_ID = 'dockerlogin'
   }
+  
   stages {
-   stage('Parse Webhook Variables') {
+    
+    stage('Parse Webhook Variables') {
       steps {
         script {
           echo "Webhook Variables:"
@@ -14,11 +16,14 @@ pipeline {
           echo "  ref_type: ${env.ref_type ?: 'not set'}"
           echo "  repository_name: ${env.repository_name ?: 'not set'}"
           
-          if (env.ref_type == 'tag') {
+          if (env.ref?.startsWith('refs/tags/')) {
+            env.TAG_NAME = env.ref.replaceAll('refs/tags/', '')
+            echo "Tag Name: ${env.TAG_NAME}"
+          } else if (env.ref_type == 'tag') {
             env.TAG_NAME = env.ref
             echo "Tag Name: ${env.TAG_NAME}"
-          } else if (env.ref_type == 'branch') {
-            env.BRANCH_NAME = env.ref
+          } else if (env.ref?.startsWith('refs/heads/')) {
+            env.BRANCH_NAME = env.ref.replaceAll('refs/heads/', '')
             echo "Branch Name: ${env.BRANCH_NAME}"
           }
         }
@@ -27,7 +32,22 @@ pipeline {
     
     stage('Clone Github Repository') {
       steps {
-        checkout scm
+        script {
+          if (env.TAG_NAME) {
+            echo "Checking out tag: ${env.TAG_NAME}"
+            checkout([
+              $class: 'GitSCM',
+              branches: [[name: "refs/tags/${env.TAG_NAME}"]],
+              userRemoteConfigs: [[
+                url: 'git@github.com:rouisskhawla/k8s-minikube-vs-cluster.git',
+                credentialsId: 'github'
+              ]]
+            ])
+          } else {
+            echo "Checking out branch"
+            checkout scm
+          }
+        }
       }
     }
     
