@@ -24,18 +24,20 @@ spec:
               path: /
               port: 8082
             failureThreshold: 30
-            periodSeconds: 2
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /
               port: 8082
-            initialDelaySeconds: 20
+            initialDelaySeconds: 30
             periodSeconds: 5
-            timeoutSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /
               port: 8082
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
