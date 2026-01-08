@@ -17,6 +17,7 @@ spec:
       containers:
         - name: k8s-cluster
           image: khawlarouiss/k8s-minikube-vs-cluster:latest
+          imagePullPolicy: Always  
           ports:
             - containerPort: 8082
           startupProbe:
@@ -41,3 +42,4 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 3
+
