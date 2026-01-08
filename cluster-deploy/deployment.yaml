@@ -23,11 +23,13 @@ spec:
             httpGet:
               path: /
               port: 8082
-            initialDelaySeconds: 5
+            initialDelaySeconds: 20
             periodSeconds: 5
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /
               port: 8082
-            initialDelaySeconds: 10
+            initialDelaySeconds: 30
             periodSeconds: 10
+            timeoutSeconds: 5

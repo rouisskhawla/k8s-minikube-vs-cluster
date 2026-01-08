@@ -12,6 +12,10 @@ pipeline {
     stage('Parse Webhook Variables') {
       steps {
         script {
+          if (env.deleted == 'true') {
+            currentBuild.result = 'ABORTED'
+            return
+          }
           if (env.ref?.startsWith('refs/tags/')) {
             env.TAG_NAME = env.ref.replaceAll('refs/tags/', '')
           } else if (env.ref_type == 'tag') {

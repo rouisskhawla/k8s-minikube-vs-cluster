@@ -1,16 +1,13 @@
 # Cluster Deployment
 
-This folder contains all resources and instructions to deploy the application to a **Kubernetes cluster managed by Jenkins**.
-It includes:
+This folder contains all resources and instructions to deploy the application to a **Kubernetes cluster managed by Jenkins**. It includes:
 
 * Kubernetes manifests (`deployment.yaml`, `service.yaml`)
 * Jenkins pipeline setup
 * Instructions for cluster setup and worker node joining
 * Access information for the deployed application
 
----
-
-> **Note:** In the Jenkins pipeline, `DEPLOY_TARGET` is automatically set to `cluster` when a Git **tag** (`vX.Y.Z`) is pushed. Deployment requires **manual approval** before applying manifests. Docker images are tagged using `scripts/docker-tag.sh`, ensuring consistent versioning.
+> **Note:** In the Jenkins pipeline, `DEPLOY_TARGET` is automatically set to `cluster` when a Git **tag** (`vX.Y.Z`) is pushed. Deployment requires **manual approval**. Docker images are tagged using `scripts/docker-tag.sh` for consistent versioning.
 
 ---
 
@@ -44,8 +41,6 @@ GitHub
 
 ## 2. Common Requirements (Both VMs)
 
-Performed these steps **on both Manager and Worker VMs**.
-
 ### 2.1 Set Hostnames
 
 ```bash
@@ -56,9 +51,7 @@ sudo hostnamectl set-hostname jenkins
 sudo hostnamectl set-hostname k8s-worker
 ```
 
-Reboot both VMs.
-
----
+> Reboot both VMs after updating hostnames.
 
 ### 2.2 Disable Swap
 
@@ -67,22 +60,18 @@ sudo swapoff -a
 sudo sed -i '/ swap / s/^/#/' /etc/fstab
 ```
 
----
-
 ### 2.3 Configure Kernel Modules
 
 ```bash
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
-# Persist on reboot
+# Persist after reboot
 cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
 EOF
 ```
-
----
 
 ### 2.4 Configure Networking (sysctl)
 
@@ -98,18 +87,14 @@ sudo sysctl --system
 
 ---
 
-## 3. Install containerd (Both VMs)
+## 3. Installation
 
-### 3.1 Install containerd
+### 3.1 Install containerd (Both VMs)
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y containerd
-```
 
-### 3.2 Configure containerd
-
-```bash
 sudo mkdir -p /etc/containerd
 containerd config default | sudo tee /etc/containerd/config.toml
 
@@ -118,11 +103,7 @@ sudo systemctl restart containerd
 sudo systemctl enable containerd
 ```
 
----
-
-## 4. Install Kubernetes Tools (Both VMs)
-
-### 4.1 Add Kubernetes Repository
+### 3.2 Install Kubernetes Tools (Both VMs)
 
 ```bash
 sudo mkdir -p /etc/apt/keyrings
@@ -132,11 +113,7 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key \
 
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /" \
  | sudo tee /etc/apt/sources.list.d/kubernetes.list
-```
 
-### 4.2 Install kubeadm, kubelet, kubectl
-
-```bash
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
 sudo apt-mark hold kubelet kubeadm kubectl
@@ -144,43 +121,43 @@ sudo apt-mark hold kubelet kubeadm kubectl
 
 ---
 
-## 5. Manager VM – Initialize Control Plane
+## 4. Cluster Setup
 
-
-### 5.1 Initialize Kubernetes Cluster
+### 4.1 Manager VM – Initialize Control Plane
 
 ```bash
 sudo kubeadm init --apiserver-advertise-address=192.168.1.14
 ```
 
-> Save the **`kubeadm join` command** for the worker VM.
+> Save the **`kubeadm join`** command for the worker VM.
 
-### 5.2 Configure kubectl for Jenkins user
+Configure kubectl for Jenkins user:
 
 ```bash
 mkdir -p /var/lib/jenkins/.kube
 sudo cp /etc/kubernetes/admin.conf /var/lib/jenkins/.kube/config
-sudo su - jenkins
-chown $(id -u):$(id -g) $HOME/.kube/config
+sudo chown jenkins:jenkins /var/lib/jenkins/.kube/config
+```
 
+Verify cluster:
+
+```bash
 kubectl get nodes
 kubectl get pods -n kube-system
 ```
 
-### 5.4 Install Pod Network (Flannel)
+Install Flannel CNI:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/flannel-io/flannel/master/Documentation/kube-flannel.yml
 kubectl get pods -n kube-system
 ```
 
-> Waited until all Flannel pods are `Running`.
+> Wait until all Flannel pods are `Running`.
 
----
+### 4.2 Worker VM – Join Cluster
 
-## 6. Worker VM – Join Cluster
-
-Used the **`kubeadm join`** command saved from Manager VM:
+Run the **`kubeadm join`** command saved from the Manager VM:
 
 ```bash
 sudo kubeadm join 192.168.1.14:6443 \
@@ -202,11 +179,9 @@ Expected:
 
 ---
 
-### 7. Node IP Configuration & kube-proxy Fix
+## 5. Node IP Configuration & kube-proxy Fix
 
-If `kube-proxy` shows `CrashLoopBackOff` after Flannel installation, configure the kubelet to use the **bridged network IP** via `/etc/default/kubelet`.
-
-#### **7.1 Manager VM**
+### 5.1 Manager VM
 
 ```bash
 sudo tee /etc/default/kubelet <<EOF
@@ -217,7 +192,7 @@ sudo systemctl daemon-reload
 sudo systemctl restart kubelet
 ```
 
-#### **7.2 Worker VM**
+### 5.2 Worker VM
 
 ```bash
 sudo tee /etc/default/kubelet <<EOF
@@ -228,36 +203,85 @@ sudo systemctl daemon-reload
 sudo systemctl restart kubelet
 ```
 
-#### **7.3 Recreate kube-proxy Pods**
+### 5.3 Recreate kube-proxy Pods
 
 ```bash
 kubectl -n kube-system delete pod -l k8s-app=kube-proxy
 ```
 
-Kubernetes will automatically recreate the `kube-proxy` pods with the correct node IP.
+Kubernetes will recreate the `kube-proxy` pods with the correct node IP.
 
 ---
 
-✅ After this, running:
+## 6. Ubuntu 24.04 iptables-legacy Fix
+
+* **Issue:** `kube-proxy` CrashLoopBackOff due to default **nftables**
+* **Affected VMs:** Worker node (required), Manager node (recommended)
+
+### 6.1 Worker Node (REQUIRED)
 
 ```bash
-kubectl get pods -n kube-system
-kubectl get nodes -o wide
+sudo apt update
+sudo apt install -y iptables arptables ebtables
+
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+sudo update-alternatives --set arptables /usr/sbin/arptables-legacy
+sudo update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+
+sudo systemctl restart containerd
+sudo systemctl restart kubelet
 ```
 
-Should show:
+### 6.2 Control-Plane Node (RECOMMENDED)
 
-* `kube-proxy` → `Running`
-* Nodes → `Ready` with correct INTERNAL-IP addresses
-  
-![Kubernetes Cluster State](docs/k8s-cluster-state.png)
+```bash
+sudo apt update
+sudo apt install -y iptables arptables ebtables
+
+sudo update-alternatives --set iptables /usr/sbin/iptables-legacy
+sudo update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+sudo update-alternatives --set arptables /usr/sbin/arptables-legacy
+sudo update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+
+sudo systemctl restart containerd
+sudo systemctl restart kubelet
+```
+
+### 6.3 Recreate kube-proxy Pods (Control-Plane Node ONLY)
+
+```bash
+kubectl -n kube-system delete pod -l k8s-app=kube-proxy
+```
+
+### 6.4 Verification (Any Node)
+
+```bash
+iptables --version
+```
+
+Expected:
+
+```
+iptables v1.x.x (legacy)
+```
+
+```bash
+kubectl -n kube-system get pods -l k8s-app=kube-proxy
+```
+
+Expected:
+
+```
+STATUS: Running
+```
 
 ---
 
-### 8. Jenkins CI/CD Integration
+## 7. Jenkins CI/CD Integration
 
 * `DEPLOY_TARGET = cluster` for Git tags (`vX.Y.Z`)
-* Deployment **requires manual approval** in Jenkins before applying manifests
+* Deployment **requires manual approval** in Jenkins
 * Jenkins applies:
 
 ```bash
@@ -265,34 +289,31 @@ kubectl apply -f cluster-deploy/deployment.yaml
 kubectl apply -f cluster-deploy/service.yaml
 ```
 
-* Deployment is verified via:
+* Verification:
 
-  * Rollout status of the Kubernetes deployment
+  * Rollout status of deployment
   * Pod readiness and node placement
-  * Service exposure and NodePort
-
+  * Service exposure via NodePort
 
 ---
 
-### 9. Access Deployed Application
+## 8. Access Deployed Application
 
-* The application is exposed using a **NodePort** service defined in `service.yaml`
-* Retrieve the NodePort assigned to the service:
+Retrieve the NodePort:
 
 ```bash
 kubectl get svc k8s-cluster
 ```
 
-* Access the application using the Worker Node IP and NodePort:
+Access using Worker Node IP and NodePort:
 
 ```
-http://192.168.1.11:<NODE_PORT>
+http://192.168.1.11:30082
 ```
 
-Replace `<NODE_PORT>` with the value returned by the service listing.
+---
 
+## 9. References
 
-## 10. References
-
-* [Kubernetes docs](https://kubernetes.io/docs/home/)
-* [Flannel CNI plugin](https://github.com/flannel-io/flannel)
+* [Kubernetes Official Docs](https://kubernetes.io/docs/home/)
+* [Flannel CNI Plugin](https://github.com/flannel-io/flannel)
